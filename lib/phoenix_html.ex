@@ -162,12 +162,28 @@ defmodule Phoenix.HTML do
   end
 
   @doc """
-  Escapes quotes (double and single), double backslashes and other.
+  Escapes a string to make it safe to put in a javascript string literal.
 
-  This function is useful in JavaScript responses when there is a need
+  A value returned from this function is safe to put within a double or single
+  quoted javascript string. The string may safely be used in a standalone
+  script, a html script tag or a html attribute, such as:
+
+      <script>
+        var userName = "<%= escape_javascript(user.name)";
+      </script>
+
+  or
+      <span onclick="console.log('clicked: <%= escape_javascript(text) %>')">text</span
+
+  This function is also useful in JavaScript responses when there is a need
   to escape html rendered from other templates, like in the following:
 
-      $("#container").append("<%= escape_javascript(render("post.html", post: @post)) %>");
+      document.getElementById("container").innerHTML = "<%= escape_javascript(render("post.html", post: @post)) %>";
+
+  Note that this function only makes the string safe to use in a javascript
+  string, it does not make it safe to use as html in the browser. In the example
+  above, it's safe since the `render`-call will return valid markup with user
+  input already escaped.
   """
   @spec escape_javascript(binary | safe) :: String.t
   def escape_javascript({:safe, data}) do
@@ -178,20 +194,25 @@ defmodule Phoenix.HTML do
     escape_javascript(data, "")
   end
 
-  defp escape_javascript(<<0x2028::utf8, t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, "\\u2028">>)
-  defp escape_javascript(<<0x2029::utf8, t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, "\\u2029">>)
-  defp escape_javascript(<<0::utf8, t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, "\\u0000">>)
-  defp escape_javascript(<<"</", t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, ?<, ?\\, ?/>>)
-  defp escape_javascript(<<"\r\n", t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, ?\\, ?n>>)
-  defp escape_javascript(<<h, t::binary>>, acc) when h in [?", ?', ?\\],
-    do: escape_javascript(t, <<acc::binary, ?\\, h>>)
-  defp escape_javascript(<<h, t::binary>>, acc) when h in [?\r, ?\n],
-    do: escape_javascript(t, <<acc::binary, ?\\, ?n>>)
+  js_escapes = [
+    # HTML special characters
+    {?<,     "\\u003C"},
+    {?>,     "\\u003E"},
+    {?&,     "\\u0026"},
+    {?",     "\\u0022"},
+    {?',     "\\u0027"},
+    {0,      "\\u0000"},
+    # JS special characters
+    {?\\,    "\\\\"},
+    {0x2028, "\\u2028"},
+    {0x2029, "\\u2029"},
+    {?\n,    "\\n"},
+    {?\r,    "\\r"},
+  ]
+  for {codepoint, replacement} <- js_escapes do
+    defp escape_javascript(unquote(<<codepoint::utf8>>) <> tail, acc),
+      do: escape_javascript(tail, acc <> unquote(replacement))
+  end
   defp escape_javascript(<<h, t::binary>>, acc),
     do: escape_javascript(t, <<acc::binary, h>>)
   defp escape_javascript(<<>>, acc),

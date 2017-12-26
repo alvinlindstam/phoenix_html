@@ -13,17 +13,18 @@ defmodule Phoenix.HTMLTest do
   test "escape_javascript/1" do
     assert escape_javascript("") == ""
     assert escape_javascript("\\Double backslash") == "\\\\Double backslash"
-    assert escape_javascript("\"Double quote\"") == "\\\"Double quote\\\""
-    assert escape_javascript("'Single quote'") == "\\'Single quote\\'"
-    assert escape_javascript("New line\r") == "New line\\n"
+    assert escape_javascript("\"Double quote\"") == "\\u0022Double quote\\u0022"
+    assert escape_javascript("'Single quote'") == "\\u0027Single quote\\u0027"
+    assert escape_javascript("New line\r") == "New line\\r"
     assert escape_javascript("New line\n") == "New line\\n"
-    assert escape_javascript("New line\r\n") == "New line\\n"
-    assert escape_javascript("</close>") == "<\\/close>"
+    assert escape_javascript("New line\r\n") == "New line\\r\\n"
+    assert escape_javascript("</close>") == "\\u003C/close\\u003E"
+    assert escape_javascript("Ampersand&") == "Ampersand\\u0026"
     assert escape_javascript("Line separator\u2028") == "Line separator\\u2028"
     assert escape_javascript("Paragraph separator\u2029") == "Paragraph separator\\u2029"
     assert escape_javascript("Null character\u0000") == "Null character\\u0000"
-    assert escape_javascript({:safe, "'Single quote'"}) == {:safe, "\\'Single quote\\'"}
-    assert escape_javascript({:safe, ["'Single quote'"]}) == {:safe, "\\'Single quote\\'"}
+    assert escape_javascript({:safe, "'Single quote'"}) == {:safe, "\\u0027Single quote\\u0027"}
+    assert escape_javascript({:safe, ["'Single quote'"]}) == {:safe, "\\u0027Single quote\\u0027"}
   end
 
   test "only accepts valid iodata" do
