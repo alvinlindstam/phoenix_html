@@ -187,11 +187,11 @@ defmodule Phoenix.HTML do
   """
   @spec escape_javascript(binary | safe) :: safe
   def escape_javascript({:safe, data}) do
-    {:safe, data |> IO.iodata_to_binary |> escape_javascript("")}
+    {:safe, escape_js_to_iodata(data)}
   end
 
   def escape_javascript(data) when is_binary(data) do
-    {:safe, escape_javascript(data, "")}
+    {:safe, escape_js_to_iodata(data)}
   end
 
   js_escapes = [
@@ -209,12 +209,34 @@ defmodule Phoenix.HTML do
     {?\n,    "\\n"},
     {?\r,    "\\r"},
   ]
+
   for {codepoint, replacement} <- js_escapes do
-    defp escape_javascript(unquote(<<codepoint::utf8>>) <> tail, acc),
-      do: escape_javascript(tail, acc <> unquote(replacement))
+    defp escape_js_to_iodata(unquote(<<codepoint::utf8>>) <> tail, original, len) do
+      if len > 0 do
+        [binary_part(original, 0, len), unquote(replacement) | escape_js_to_iodata(tail)]
+      else
+        [unquote(replacement) | escape_js_to_iodata(tail)]
+      end
+    end
   end
-  defp escape_javascript(<<h, t::binary>>, acc),
-    do: escape_javascript(t, <<acc::binary, h>>)
-  defp escape_javascript(<<>>, acc),
-    do: acc
+  defp escape_js_to_iodata(<<_, tail::binary>>, original, len),
+    do: escape_js_to_iodata(tail, original, len + 1)
+  defp escape_js_to_iodata(<<>>, <<>>, 0),
+    do: []
+  defp escape_js_to_iodata(<<>>, original, len) when byte_size(original) == len,
+    do: original
+
+  defp escape_js_to_iodata(data) when is_binary(data),
+    do: escape_js_to_iodata(data, data, 0)
+
+  defp escape_js_to_iodata(data) when is_list(data),
+    do: Enum.map(data, &escape_js_to_iodata/1)
+
+  for {codepoint, replacement} <- js_escapes, codepoint <= ?' do
+    defp escape_js_to_iodata(unquote(codepoint)) do
+      unquote(replacement)
+    end
+  end
+  defp escape_js_to_iodata(data) when is_integer(data),
+    do: data
 end
