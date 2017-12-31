@@ -182,16 +182,16 @@ defmodule Phoenix.HTML do
 
   Note that this function only makes the string safe to use in a javascript
   string, it does not make it safe to use as html in the browser. In the example
-  above, it's safe since the `render`-call will return valid markup with user
+  above, it's safe since the `render`-call will return safe markup with untrusted
   input already escaped.
   """
-  @spec escape_javascript(binary | safe) :: String.t
+  @spec escape_javascript(binary | safe) :: safe
   def escape_javascript({:safe, data}) do
-    {:safe, data |> IO.iodata_to_binary |> escape_javascript}
+    {:safe, data |> IO.iodata_to_binary |> escape_javascript("")}
   end
 
   def escape_javascript(data) when is_binary(data) do
-    escape_javascript(data, "")
+    {:safe, escape_javascript(data, "")}
   end
 
   js_escapes = [
